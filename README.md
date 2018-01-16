@@ -5,3 +5,6 @@
 ## Pre-trained weights on ImageNet
 Model weights: [vgg16_weights.npz](https://www.cs.toronto.edu/~frossard/vgg16/vgg16_weights.npz) from Davi Frossard ([post](https://www.cs.toronto.edu/~frossard/post/vgg16/))
 
+# Reference
+https://github.com/machrisaa/tensorflow-vgg/blob/master/vgg16.py
+https://www.cs.toronto.edu/~frossard/vgg16/vgg16.py
