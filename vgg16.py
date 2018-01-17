@@ -1,65 +1,6 @@
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import gen_nn_ops
-from tensorflow.python.ops.gen_nn_ops import *
 import os
 import numpy as np
 import tensorflow as tf
-
-def my_profile(C, prof_type):
-    def half_exp(n, k=1, dtype='float32'):
-        n_ones = int(n/2)
-        n_other = n - n_ones
-        return np.append(np.ones(n_ones, dtype=dtype), np.exp((1-k)*np.arange(n_other), dtype=dtype))
-    if prof_type == "linear":
-        profile = np.linspace(1.0,0.0, num=C, endpoint=False, dtype='float32')
-    elif prof_type == "all-one":
-        profile = np.ones(C, dtype='float32')
-    elif prof_type == "half-exp":
-        profile = half_exp(C, 2.0)
-    elif prof_type == "harmonic":
-        profile = np.array(1.0/(np.arange(C)+1))
-    else:
-        raise ValueError("prof_type must be \"all-one\", \"half-exp\", \"harmonic\" or \"linear\".")
-    return profile
-
-def idp_conv2d(input, filter, strides, padding,
-               use_cudnn_on_gpu=True, data_format='NHWC',
-               name=None, prof_type=None, dp=1.0):
-    with ops.name_scope(name, "idp_convolution", [input, filter]) as scope:
-        if not (data_format == "NHWC" or data_format == "NCHW"):
-            raise ValueError("data_format must be \"NHWC\" or \"NCHW\".")
-        
-        # do conv2d
-        conv2d_res = gen_nn_ops.conv2d(input, filter, strides, padding,
-                                       use_cudnn_on_gpu=True,
-                                       data_format='NHWC',
-                                       name=None)
-        B,H,W,C = conv2d_res.get_shape().as_list()
-        
-        # get profile
-        profile = my_profile(C, prof_type)
-        # tensor_profile = tf.get_variable(initializer=profile,name="tensor_profile",dtype='float32')
-
-        # create a mask determined by the dot product percentage
-        n1 = int(C * dp)
-        n0 = C - n1
-        mask = np.append(np.ones(n1, dtype='float32'), np.zeros(n0, dtype='float32'))
-        if len(profile) == len(mask):
-            profile *= mask
-        else:
-            raise ValueError("profile and mask must have the same shape.")
-
-        # create a profile coefficient, gamma
-        conv2d_profile = np.stack([profile for i in range(B*H*W)])
-        conv2d_profile = np.reshape(conv2d_profile, newshape=(B, H, W, C))
-        
-        gamma = tf.get_variable(initializer=conv2d_profile, name="gamma"+str(dp*100))
-        
-        # IDP conv2d output
-        idp_conv2d_res = tf.multiply(conv2d_res, gamma, name="idp"+str(dp*100))
-        
-        return idp_conv2d_res
-
 
 VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
 
@@ -76,72 +17,115 @@ class vgg16:
             vgg16_npy_path = path
             print(path)
         
-        self.data_dict = np.load(vgg16_npy_path).item()
+        self.data_dict = np.load(vgg16_npy_path)
         print("npy file loaded")
+        
+        self.B, self.H, self.W, self.C = 32, 32, 32, 3
+        self.classes = 10
+        
+        # dictionary for operation
+        self.prob_dict = {}
+        self.loss_dict = {}
+        self.accu_dict = {}
+        
+        self.x = tf.placeholder(tf.float32, [self.B, self.H, self.W, self.C])
+        self.y = tf.placeholder(tf.float32, [self.B, self.classes])
 
-        # cnn layer
-        self.cnn_layer = []
-
-        # loss
-        self.loss_list = []
-
-    def build(self, rgb):
+    def build(self, dp, prof_type):
         """
         load variable from npy to build the VGG
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
         """
-
+        self.dp = dp 
+        print("Will optimize at DP=", self.dp)
         start_time = time.time()
         print("build model started")
-        rgb_scaled = rgb * 255.0
+        rgb_scaled = self.x * 255.0
 
         # normalization
         red, green, blue = tf.split(axis=3, num_or_size_splits=3, value=rgb_scaled)
-        assert red.get_shape().as_list()[1:] == [224, 224, 1]
-        assert green.get_shape().as_list()[1:] == [224, 224, 1]
-        assert blue.get_shape().as_list()[1:] == [224, 224, 1]
-        rgb = tf.concat(axis=3, values=[
-            red - VGG_MEAN[0],
+        assert   red.get_shape().as_list()[1:] == [self.H, self.W, 1]
+        assert green.get_shape().as_list()[1:] == [self.H, self.W, 1]
+        assert  blue.get_shape().as_list()[1:] == [self.H, self.W, 1]
+        self.x = tf.concat(axis=3, values=[
+              red - VGG_MEAN[0],
             green - VGG_MEAN[1],
-            blue - VGG_MEAN[2],
+             blue - VGG_MEAN[2],
         ])
-        assert rgb.get_shape().as_list()[1:] == [224, 224, 3]
+        assert self.x.get_shape().as_list()[1:] == [self.H, self.W, self.C]
+        
+        with tf.variable_scope("vgg16"):
+        
+            self.conv1_1_W, self.conv1_1_b = self.get_conv_filter("conv1_1"), self.get_bias("conv1_1")
+            self.conv1_2_W, self.conv1_2_b = self.get_conv_filter("conv1_2"), self.get_bias("conv1_2")
 
-        self.conv1_1 = self.conv_layer(rgb, "conv1_1")
-        self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
-        self.pool1 = self.max_pool(self.conv1_2, 'pool1')
+            self.conv2_1_W, self.conv2_1_b = self.get_conv_filter("conv2_1"), self.get_bias("conv2_1")
+            self.conv2_2_W, self.conv2_2_b = self.get_conv_filter("conv2_2"), self.get_bias("conv2_2")
 
-        self.conv2_1 = self.conv_layer(self.pool1, "conv2_1")
-        self.conv2_2 = self.conv_layer(self.conv2_1, "conv2_2")
-        self.pool2 = self.max_pool(self.conv2_2, 'pool2')
+            self.conv3_1_W, self.conv3_1_b = self.get_conv_filter("conv3_1"), self.get_bias("conv3_1")
+            self.conv3_2_W, self.conv3_2_b = self.get_conv_filter("conv3_2"), self.get_bias("conv3_2")
+            self.conv3_3_W, self.conv3_3_b = self.get_conv_filter("conv3_3"), self.get_bias("conv3_3")
 
-        self.conv3_1 = self.conv_layer(self.pool2, "conv3_1")
-        self.conv3_2 = self.conv_layer(self.conv3_1, "conv3_2")
-        self.conv3_3 = self.conv_layer(self.conv3_2, "conv3_3")
-        self.pool3 = self.max_pool(self.conv3_3, 'pool3')
+            self.conv4_1_W, self.conv4_1_b = self.get_conv_filter("conv4_1"), self.get_bias("conv4_1")
+            self.conv4_2_W, self.conv4_2_b = self.get_conv_filter("conv4_2"), self.get_bias("conv4_2")
+            self.conv4_3_W, self.conv4_3_b = self.get_conv_filter("conv4_3"), self.get_bias("conv4_3")
 
-        self.conv4_1 = self.conv_layer(self.pool3, "conv4_1")
-        self.conv4_2 = self.conv_layer(self.conv4_1, "conv4_2")
-        self.conv4_3 = self.conv_layer(self.conv4_2, "conv4_3")
-        self.pool4 = self.max_pool(self.conv4_3, 'pool4')
+            self.conv5_1_W, self.conv5_1_b = self.get_conv_filter("conv5_1"), self.get_bias("conv5_1")
+            self.conv5_2_W, self.conv5_2_b = self.get_conv_filter("conv5_2"), self.get_bias("conv5_2")
+            self.conv5_3_W, self.conv5_3_b = self.get_conv_filter("conv5_3"), self.get_bias("conv5_3")
 
-        self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
-        self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
-        self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
-        self.pool5 = self.max_pool(self.conv5_3, 'pool5')
+            self.fc_1_W = tf.get_variable(name="fc_1_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
+            self.fc_1_b = tf.get_variable(name="fc_1_b", shape=(512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
 
-        self.fc6 = self.fc_layer(self.pool5, "fc6")
-        assert self.fc6.get_shape().as_list()[1:] == [4096]
-        self.relu6 = tf.nn.relu(self.fc6)
+            self.fc_2_W = tf.get_variable(name="fc_2_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
+            self.fc_2_b = tf.get_variable(name="fc_2_b", shape=(512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
 
-        self.fc7 = self.fc_layer(self.relu6, "fc7")
-        self.relu7 = tf.nn.relu(self.fc7)
+            self.fc_3_W = tf.get_variable(name="fc_3_W", shape=(512, 10), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
+            self.fc_3_b = tf.get_variable(name="fc_3_b", shape=(10), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
 
-        self.fc8 = self.fc_layer(self.relu7, "fc8")
+        
+        # for loop for dp, assign prof_type
+        for dp_i in dp:
+            with tf.name_scope(str(int(dp_i*100))):
+                conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i, prof_type, gamma_trainable=False)
+                conv1_2 = self.idp_conv_layer(conv1_1, "conv1_2", dp_i, prof_type, gamma_trainable=False)
+                pool1 = self.max_pool(conv1_2, 'pool1')
 
-        self.prob = tf.nn.softmax(self.fc8, name="prob")
+                conv2_1 = self.idp_conv_layer(  pool1, "conv2_1", dp_i, prof_type, gamma_trainable=False)
+                conv2_2 = self.idp_conv_layer(conv2_1, "conv2_2", dp_i, prof_type, gamma_trainable=False)
+                pool2 = self.max_pool(conv2_2, 'pool2')
 
-        self.data_dict = None
+                conv3_1 = self.idp_conv_layer(  pool2, "conv3_1", dp_i, prof_type, gamma_trainable=False)
+                conv3_2 = self.idp_conv_layer(conv3_1, "conv3_2", dp_i, prof_type, gamma_trainable=False)
+                conv3_3 = self.idp_conv_layer(conv3_2, "conv3_3", dp_i, prof_type, gamma_trainable=False)
+                pool3 = self.max_pool(conv3_3, 'pool3')
+
+                conv4_1 = self.idp_conv_layer(  pool3, "conv4_1", dp_i, prof_type, gamma_trainable=False)
+                conv4_2 = self.idp_conv_layer(conv4_1, "conv4_2", dp_i, prof_type, gamma_trainable=False)
+                conv4_3 = self.idp_conv_layer(conv4_2, "conv4_3", dp_i, prof_type, gamma_trainable=False)
+                pool4 = self.max_pool(conv4_3, 'pool4')
+
+                conv5_1 = self.idp_conv_layer(  pool4, "conv5_1", dp_i, prof_type, gamma_trainable=False)
+                conv5_2 = self.idp_conv_layer(conv5_1, "conv5_2", dp_i, prof_type, gamma_trainable=False)
+                conv5_3 = self.idp_conv_layer(conv5_2, "conv5_3", dp_i, prof_type, gamma_trainable=False)
+                pool5 = self.max_pool(conv5_3, 'pool5')
+
+                fc_1 = self.fc_layer(pool5, 'fc_1')
+                fc_1 = tf.nn.relu(fc_1)
+                fc_2 = self.fc_layer(fc_1, 'fc_2')
+                fc_2 = tf.nn.relu(fc_2)
+                
+                logits = tf.nn.bias_add(tf.matmul( fc_2, self.fc_3_W), self.fc_3_b)
+                prob = tf.nn.softmax(logits, name="prob")
+                
+                cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=self.y)
+                loss = tf.reduce_mean(cross_entropy)
+                accuracy = tf.equal(x=tf.argmax(logits, 1), y=tf.argmax(self.y, 1))
+                
+                self.prob_dict[str(int(dp_i*100))] = prob
+                self.loss_dict[str(int(dp_i*100))] = loss
+                self.accu_dict[str(int(dp_i*100))] = accuracy
+                
         print(("build model finished: %ds" % (time.time() - start_time)))
 
     def avg_pool(self, bottom, name):
@@ -150,28 +134,55 @@ class vgg16:
     def max_pool(self, bottom, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
-    def conv_layer(self, bottom, name):
-        with tf.variable_scope(name):
-            filt = self.get_conv_filter(name)
+    def idp_conv_layer(self, bottom, name, dp, prof_type, gamma_trainable = False):
+        with tf.name_scope(name+str(int(dp*100))):
+            with tf.variable_scope("vgg16",reuse=True):
+                conv_filter = tf.get_variable(name=name+"_W")
+                conv_biases = tf.get_variable(name=name+"_b")
+            
+            H,W,C,O = conv_filter.get_shape().as_list()
+        
+            # get profile
+            profile = self.get_profile(O, prof_type)
+            
+            # create a mask determined by the dot product percentage
+            n1 = int(O * dp)
+            n0 = O - n1
+            mask = np.append(np.ones(n1, dtype='float32'), np.zeros(n0, dtype='float32'))
+            if len(profile) == len(mask):
+                profile *= mask
+            else:
+                raise ValueError("profile and mask must have the same shape.")
 
-            conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
+            # create a profile coefficient, gamma
+            filter_profile = np.stack([profile for i in range(H*W*C)])
+            filter_profile = np.reshape(filter_profile, newshape=(H, W, C, O))
 
-            conv_biases = self.get_bias(name)
-            bias = tf.nn.bias_add(conv, conv_biases)
+            gamma_W = tf.Variable(initial_value=filter_profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
+            gamma_b = tf.Variable(initial_value=profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
 
-            relu = tf.nn.relu(bias)
+            # IDP conv2d output
+            conv_filter = tf.multiply(conv_filter, gamma_W)
+            conv_biases = tf.multiply(conv_biases, gamma_b)
+            
+            conv = tf.nn.conv2d(bottom, conv_filter, [1, 1, 1, 1], padding='SAME')
+            
+            conv = tf.nn.bias_add(conv, conv_biases)
+            
+            relu = tf.nn.relu(conv)
             return relu
 
     def fc_layer(self, bottom, name):
-        with tf.variable_scope(name):
+        with tf.name_scope(name):
             shape = bottom.get_shape().as_list()
             dim = 1
             for d in shape[1:]:
                 dim *= d
             x = tf.reshape(bottom, [-1, dim])
-
-            weights = self.get_fc_weight(name)
-            biases = self.get_bias(name)
+            
+            with tf.variable_scope("vgg16",reuse=True):
+                weights = tf.get_variable(name=name+"_W")
+                biases = tf.get_variable(name=name+"_b")
 
             # Fully connected layer. Note that the '+' operation automatically
             # broadcasts the biases.
@@ -179,16 +190,25 @@ class vgg16:
             return fc
 
     def get_conv_filter(self, name):
-        self.cnn_layer = self.cnn_layer.append(name)
-        return tf.get_variable(initializer=self.data_dict[name+"_W"], name="conv_W")
+        return tf.get_variable(initializer=self.data_dict[name+"_W"], name=name+"_W")
     def get_bias(self, name):
-        return tf.get_variable(initializer=self.data_dict[name+"_b"], name="conv_b")
+        return tf.get_variable(initializer=self.data_dict[name+"_b"], name=name+"_b")
     def get_fc_weight(self, name):
-        return tf.get_variable(initializer=self.data_dict[name+"_W"], name="fc_W")
+        return tf.get_variable(initializer=self.data_dict[name+"_W"], name=name+"_W")
 
-    def aggregate_loss(self,idp):
-        for layer in self.cnn_layer:
-            with tf.variable_scope(layer,reuse=True):
-                conv_W = tf.get_variable(name="conv_W")
-                conv_b = tf.get_variable(name="conv_b")
-                
+    def get_profile(self, C, prof_type):
+        def half_exp(n, k=1, dtype='float32'):
+            n_ones = int(n/2)
+            n_other = n - n_ones
+            return np.append(np.ones(n_ones, dtype=dtype), np.exp((1-k)*np.arange(n_other), dtype=dtype))
+        if prof_type == "linear":
+            profile = np.linspace(1.0,0.0, num=C, endpoint=False, dtype='float32')
+        elif prof_type == "all-one":
+            profile = np.ones(C, dtype='float32')
+        elif prof_type == "half-exp":
+            profile = half_exp(C, 2.0)
+        elif prof_type == "harmonic":
+            profile = np.array(1.0/(np.arange(C)+1))
+        else:
+            raise ValueError("prof_type must be \"all-one\", \"half-exp\", \"harmonic\" or \"linear\".")
+        return profile

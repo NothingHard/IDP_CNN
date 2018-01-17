@@ -35,13 +35,13 @@
 import numpy as np
 import pickle
 import os
-import download
+#import download
 
 ########################################################################
 
 # Directory where you want to download and save the data-set.
 # Set this before you start calling any of the functions below.
-data_path = "data/CIFAR-10/"
+data_path = "/Users/chunmingchang/data/"
 
 # URL for the data-set on the internet.
 data_url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
@@ -181,13 +181,13 @@ def _load_data(filename):
 # the internet and load the data into memory.
 
 
-def maybe_download_and_extract():
-    """
-    Download and extract the CIFAR-10 data-set if it doesn't already exist
-    in data_path (set this variable first to the desired path).
-    """
+# def maybe_download_and_extract():
+#     """
+#     Download and extract the CIFAR-10 data-set if it doesn't already exist
+#     in data_path (set this variable first to the desired path).
+#     """
 
-    download.maybe_download_and_extract(url=data_url, download_dir=data_path)
+#     download.maybe_download_and_extract(url=data_url, download_dir=data_path)
 
 
 def load_class_names():
