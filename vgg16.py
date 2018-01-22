@@ -1,61 +1,68 @@
 import os
+import time
 import numpy as np
 import tensorflow as tf
 
-VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
-
-class vgg16:
+# VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
+VGG_MEAN = [103.939, 116.779, 123.68] # [B, G, R]
+class VGG16:
     def __init__(self, vgg16_npy_path=None):
         """
         load pre-trained weights from path
         :param vgg16_npy_path: file path of vgg16 pre-trained weights
         """
+        
+        # load pre-trained weights
         if vgg16_npy_path is None:
             path = inspect.getfile(Vgg16)
             path = os.path.abspath(os.path.join(path, os.pardir))
-            path = os.path.join(path, "vgg16_weights.npz")
-            vgg16_npy_path = path
-            print(path)
-        
-        self.data_dict = np.load(vgg16_npy_path)
+            vgg16_npy_path = os.path.join(path, "vgg16.npy")
+            print(vgg16_npy_path)     
+        self.data_dict = np.load(vgg16_npy_path,encoding='latin1').item()
         print("npy file loaded")
         
-        self.B, self.H, self.W, self.C = 32, 32, 32, 3
+        # input information
+        self.H, self.W, self.C = 32, 32, 3
         self.classes = 10
         
-        # dictionary for operation
+        # operation dictionary
         self.prob_dict = {}
         self.loss_dict = {}
         self.accu_dict = {}
         
-        self.x = tf.placeholder(tf.float32, [self.B, self.H, self.W, self.C])
-        self.y = tf.placeholder(tf.float32, [self.B, self.classes])
+        # input placeholder
+        self.x = tf.placeholder(tf.float32, [None, self.H, self.W, self.C])
+        self.y = tf.placeholder(tf.float32, [None, self.classes])
 
     def build(self, dp, prof_type):
         """
         load variable from npy to build the VGG
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
         """
+        
         self.dp = dp 
         print("Will optimize at DP=", self.dp)
+        
         start_time = time.time()
         print("build model started")
         rgb_scaled = self.x * 255.0
 
-        # normalization
+        # normalize input by VGG_MEAN
         red, green, blue = tf.split(axis=3, num_or_size_splits=3, value=rgb_scaled)
         assert   red.get_shape().as_list()[1:] == [self.H, self.W, 1]
         assert green.get_shape().as_list()[1:] == [self.H, self.W, 1]
         assert  blue.get_shape().as_list()[1:] == [self.H, self.W, 1]
         self.x = tf.concat(axis=3, values=[
-              red - VGG_MEAN[0],
+              blue - VGG_MEAN[0],
             green - VGG_MEAN[1],
-             blue - VGG_MEAN[2],
+             red - VGG_MEAN[2],
         ])
         assert self.x.get_shape().as_list()[1:] == [self.H, self.W, self.C]
         
-        with tf.variable_scope("vgg16"):
-        
+        # declare and initialize the weights of VGG16
+        with tf.variable_scope("VGG16"):
+            
+            # transfer Convolutional filters trained on ImageNet to our model
             self.conv1_1_W, self.conv1_1_b = self.get_conv_filter("conv1_1"), self.get_bias("conv1_1")
             self.conv1_2_W, self.conv1_2_b = self.get_conv_filter("conv1_2"), self.get_bias("conv1_2")
 
@@ -74,17 +81,14 @@ class vgg16:
             self.conv5_2_W, self.conv5_2_b = self.get_conv_filter("conv5_2"), self.get_bias("conv5_2")
             self.conv5_3_W, self.conv5_3_b = self.get_conv_filter("conv5_3"), self.get_bias("conv5_3")
 
+            # user specified fully connected layers
             self.fc_1_W = tf.get_variable(name="fc_1_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
-            self.fc_1_b = tf.get_variable(name="fc_1_b", shape=(512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
+            self.fc_1_b = tf.get_variable(name="fc_1_b", shape=(512), initializer=tf.ones_initializer(), dtype=tf.float32)
 
-            self.fc_2_W = tf.get_variable(name="fc_2_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
-            self.fc_2_b = tf.get_variable(name="fc_2_b", shape=(512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
-
-            self.fc_3_W = tf.get_variable(name="fc_3_W", shape=(512, 10), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
-            self.fc_3_b = tf.get_variable(name="fc_3_b", shape=(10), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
-
+            self.fc_2_W = tf.get_variable(name="fc_2_W", shape=(512, 10), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
+            self.fc_2_b = tf.get_variable(name="fc_2_b", shape=(10), initializer=tf.ones_initializer(), dtype=tf.float32)
         
-        # for loop for dp, assign prof_type
+        # create operations at every dot product percentages
         for dp_i in dp:
             with tf.name_scope(str(int(dp_i*100))):
                 conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i, prof_type, gamma_trainable=False)
@@ -111,21 +115,24 @@ class vgg16:
                 pool5 = self.max_pool(conv5_3, 'pool5')
 
                 fc_1 = self.fc_layer(pool5, 'fc_1')
+                fc_1 = tf.nn.dropout(fc_1, keep_prob=0.5)
                 fc_1 = tf.nn.relu(fc_1)
-                fc_2 = self.fc_layer(fc_1, 'fc_2')
-                fc_2 = tf.nn.relu(fc_2)
                 
-                logits = tf.nn.bias_add(tf.matmul( fc_2, self.fc_3_W), self.fc_3_b)
+                logits = tf.nn.bias_add(tf.matmul( fc_1, self.fc_2_W), self.fc_2_b)
                 prob = tf.nn.softmax(logits, name="prob")
                 
                 cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=self.y)
                 loss = tf.reduce_mean(cross_entropy)
-                accuracy = tf.equal(x=tf.argmax(logits, 1), y=tf.argmax(self.y, 1))
+                accuracy = tf.reduce_mean(tf.cast(tf.equal(x=tf.argmax(logits, 1), y=tf.argmax(self.y, 1)),tf.float32))
                 
                 self.prob_dict[str(int(dp_i*100))] = prob
                 self.loss_dict[str(int(dp_i*100))] = loss
                 self.accu_dict[str(int(dp_i*100))] = accuracy
                 
+                tf.summary.scalar(name="accu_at_"+str(int(dp_i*100)), tensor=accuracy)
+                tf.summary.scalar(name="loss_at_"+str(int(dp_i*100)), tensor=loss)
+        
+        self.summary_op = tf.summary.merge_all()
         print(("build model finished: %ds" % (time.time() - start_time)))
 
     def avg_pool(self, bottom, name):
@@ -157,7 +164,8 @@ class vgg16:
             # create a profile coefficient, gamma
             filter_profile = np.stack([profile for i in range(H*W*C)])
             filter_profile = np.reshape(filter_profile, newshape=(H, W, C, O))
-
+            
+            # gamma in use
             gamma_W = tf.Variable(initial_value=filter_profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
             gamma_b = tf.Variable(initial_value=profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
 
@@ -166,10 +174,9 @@ class vgg16:
             conv_biases = tf.multiply(conv_biases, gamma_b)
             
             conv = tf.nn.conv2d(bottom, conv_filter, [1, 1, 1, 1], padding='SAME')
-            
             conv = tf.nn.bias_add(conv, conv_biases)
-            
             relu = tf.nn.relu(conv)
+            
             return relu
 
     def fc_layer(self, bottom, name):
@@ -190,11 +197,11 @@ class vgg16:
             return fc
 
     def get_conv_filter(self, name):
-        return tf.get_variable(initializer=self.data_dict[name+"_W"], name=name+"_W")
+        return tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
     def get_bias(self, name):
-        return tf.get_variable(initializer=self.data_dict[name+"_b"], name=name+"_b")
-    def get_fc_weight(self, name):
-        return tf.get_variable(initializer=self.data_dict[name+"_W"], name=name+"_W")
+        return tf.get_variable(initializer=self.data_dict[name][1], name=name+"_b")
+#     def get_fc_weight(self, name):
+#         return tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
 
     def get_profile(self, C, prof_type):
         def half_exp(n, k=1, dtype='float32'):
@@ -212,3 +219,4 @@ class vgg16:
         else:
             raise ValueError("prof_type must be \"all-one\", \"half-exp\", \"harmonic\" or \"linear\".")
         return profile
+                

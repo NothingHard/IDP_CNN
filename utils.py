@@ -34,227 +34,304 @@
 
 import numpy as np
 import pickle
-import os
-#import download
 
-########################################################################
+class CIFAR10(object):
+    def __init__(self):
 
-# Directory where you want to download and save the data-set.
-# Set this before you start calling any of the functions below.
-data_path = "/Users/chunmingchang/data/"
+        ########################################################################
+        # Directory where you want to download and save the data-set.
+        # Set this before you start calling any of the functions below.
+        self.data_path = "/home/cmchang/IDP_CNN/data/"
 
-# URL for the data-set on the internet.
-data_url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+        # URL for the data-set on the internet.
+        self.data_url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
 
-########################################################################
-# Various constants for the size of the images.
-# Use these constants in your own program.
+        ########################################################################
+        # Various constants for the size of the images.
+        # Use these constants in your own program.
 
-# Width and height of each image.
-img_size = 32
+        # Width and height of each image.
+        self.img_size = 32
 
-# Number of channels in each image, 3 channels: Red, Green, Blue.
-num_channels = 3
+        # Number of channels in each image, 3 channels: Red, Green, Blue.
+        self.num_channels = 3
 
-# Length of an image when flattened to a 1-dim array.
-img_size_flat = img_size * img_size * num_channels
+        # Length of an image when flattened to a 1-dim array.
+        self.img_size_flat = self.img_size * self.img_size * self.num_channels
 
-# Number of classes.
-num_classes = 10
+        # Number of classes.
+        self.num_classes = 10
 
-########################################################################
-# Various constants used to allocate arrays of the correct size.
+        ########################################################################
 
-# Number of files for the training-set.
-_num_files_train = 5
+    def _one_hot_encoded(self, class_numbers, num_classes=None):
+        """
+        Generate the One-Hot encoded class-labels from an array of integers.
+        For example, if class_number=2 and num_classes=4 then
+        the one-hot encoded label is the float array: [0. 0. 1. 0.]
+        :param class_numbers:
+            Array of integers with class-numbers.
+            Assume the integers are from zero to num_classes-1 inclusive.
+        :param num_classes:
+            Number of classes. If None then use max(class_numbers)+1.
+        :return:
+            2-dim array of shape: [len(class_numbers), num_classes]
+        """
 
-# Number of images for each batch-file in the training-set.
-_images_per_file = 10000
+        # Find the number of classes if None is provided.
+        # Assumes the lowest class-number is zero.
+        if num_classes is None:
+            num_classes = np.max(class_numbers) + 1
 
-# Total number of images in the training-set.
-# This is used to pre-allocate arrays for efficiency.
-_num_images_train = _num_files_train * _images_per_file
+        return np.eye(num_classes, dtype=float)[class_numbers]
 
-########################################################################
-# 
-def _one_hot_encoded(class_numbers, num_classes=None):
-    """
-    Generate the One-Hot encoded class-labels from an array of integers.
-    For example, if class_number=2 and num_classes=4 then
-    the one-hot encoded label is the float array: [0. 0. 1. 0.]
-    :param class_numbers:
-        Array of integers with class-numbers.
-        Assume the integers are from zero to num_classes-1 inclusive.
-    :param num_classes:
-        Number of classes. If None then use max(class_numbers)+1.
-    :return:
-        2-dim array of shape: [len(class_numbers), num_classes]
-    """
+    ########################################################################
+    # Private functions for downloading, unpacking and loading data-files.
 
-    # Find the number of classes if None is provided.
-    # Assumes the lowest class-number is zero.
-    if num_classes is None:
-        num_classes = np.max(class_numbers) + 1
+    def _get_file_path(self, filename=""):
+        """
+        Return the full path of a data-file for the data-set.
 
-    return np.eye(num_classes, dtype=float)[class_numbers]
+        If filename=="" then return the directory of the files.
+        """
 
+        return os.path.join(self.data_path, "cifar-10-batches-py/", filename)
 
 
+    def _unpickle(self, filename):
+        """
+        Unpickle the given file and return the data.
 
+        Note that the appropriate dir-name is prepended the filename.
+        """
 
-########################################################################
-# Private functions for downloading, unpacking and loading data-files.
+        # Create full path for the file.
+        file_path = self._get_file_path(filename)
 
-def _get_file_path(filename=""):
-    """
-    Return the full path of a data-file for the data-set.
+        print("Loading data: " + file_path)
 
-    If filename=="" then return the directory of the files.
-    """
+        with open(file_path, mode='rb') as file:
+            # In Python 3.X it is important to set the encoding,
+            # otherwise an exception is raised here.
+            data = pickle.load(file, encoding='bytes')
 
-    return os.path.join(data_path, "cifar-10-batches-py/", filename)
+        return data
 
 
-def _unpickle(filename):
-    """
-    Unpickle the given file and return the data.
+    def _convert_images(self, raw):
+        """
+        Convert images from the CIFAR-10 format and
+        return a 4-dim array with shape: [image_number, height, width, channel]
+        where the pixels are floats between 0.0 and 1.0.
+        """
 
-    Note that the appropriate dir-name is prepended the filename.
-    """
+        # Convert the raw images from the data-files to floating-points.
+        raw_float = np.array(raw, dtype=float) / 255.0
 
-    # Create full path for the file.
-    file_path = _get_file_path(filename)
+        # Reshape the array to 4-dimensions.
+        images = raw_float.reshape([-1, self.num_channels, self.img_size, self.img_size])
 
-    print("Loading data: " + file_path)
+        # Reorder the indices of the array.
+        images = images.transpose([0, 2, 3, 1])
 
-    with open(file_path, mode='rb') as file:
-        # In Python 3.X it is important to set the encoding,
-        # otherwise an exception is raised here.
-        data = pickle.load(file, encoding='bytes')
+        return images
 
-    return data
 
+    def _load_data(self, filename):
+        """
+        Load a pickled data-file from the CIFAR-10 data-set
+        and return the converted images (see above) and the class-number
+        for each image.
+        """
 
-def _convert_images(raw):
-    """
-    Convert images from the CIFAR-10 format and
-    return a 4-dim array with shape: [image_number, height, width, channel]
-    where the pixels are floats between 0.0 and 1.0.
-    """
+        # Load the pickled data-file.
+        data = self._unpickle(filename)
 
-    # Convert the raw images from the data-files to floating-points.
-    raw_float = np.array(raw, dtype=float) / 255.0
+        # Get the raw images.
+        raw_images = data[b'data']
 
-    # Reshape the array to 4-dimensions.
-    images = raw_float.reshape([-1, num_channels, img_size, img_size])
+        # Get the class-numbers for each image. Convert to numpy-array.
+        cls = np.array(data[b'labels'])
 
-    # Reorder the indices of the array.
-    images = images.transpose([0, 2, 3, 1])
+        # Convert the images.
+        images = self._convert_images(raw_images)
 
-    return images
+        return images, cls
 
+    ########################################################################
+    # Public functions that you may call to download the data-set from
+    # the internet and load the data into memory.
 
-def _load_data(filename):
-    """
-    Load a pickled data-file from the CIFAR-10 data-set
-    and return the converted images (see above) and the class-number
-    for each image.
-    """
+    def load_class_names(self):
+        """
+        Load the names for the classes in the CIFAR-10 data-set.
 
-    # Load the pickled data-file.
-    data = _unpickle(filename)
+        Returns a list with the names. Example: names[3] is the name
+        associated with class-number 3.
+        """
 
-    # Get the raw images.
-    raw_images = data[b'data']
+        # Load the class-names from the pickled file.
+        raw = _unpickle(filename="batches.meta")[b'label_names']
 
-    # Get the class-numbers for each image. Convert to numpy-array.
-    cls = np.array(data[b'labels'])
+        # Convert from binary strings.
+        names = [x.decode('utf-8') for x in raw]
 
-    # Convert the images.
-    images = _convert_images(raw_images)
+        return names
 
-    return images, cls
 
+    def load_training_data(self):
+        """
+        Load all the training-data for the CIFAR-10 data-set.
 
-########################################################################
-# Public functions that you may call to download the data-set from
-# the internet and load the data into memory.
+        The data-set is split into 5 data-files which are merged here.
 
+        Returns the images, class-numbers and one-hot encoded class-labels.
+        """
+        # Number of files for the training-set.
+        _num_files_train = 5
 
-# def maybe_download_and_extract():
-#     """
-#     Download and extract the CIFAR-10 data-set if it doesn't already exist
-#     in data_path (set this variable first to the desired path).
-#     """
+        # Number of images for each batch-file in the training-set.
+        _images_per_file = 10000
 
-#     download.maybe_download_and_extract(url=data_url, download_dir=data_path)
+        # Total number of images in the training-set.
+        # This is used to pre-allocate arrays for efficiency.
+        _num_images_train = _num_files_train * _images_per_file
+        
+        
+        # Pre-allocate the arrays for the images and class-numbers for efficiency.
+        images = np.zeros(shape=[_num_images_train, self.img_size, self.img_size, self.num_channels], dtype=float)
+        cls = np.zeros(shape=[_num_images_train], dtype=int)
 
+        # Begin-index for the current batch.
+        begin = 0
 
-def load_class_names():
-    """
-    Load the names for the classes in the CIFAR-10 data-set.
+        # For each data-file.
+        for i in range(_num_files_train):
+            # Load the images and class-numbers from the data-file.
+            images_batch, cls_batch = self._load_data(filename="data_batch_" + str(i + 1))
 
-    Returns a list with the names. Example: names[3] is the name
-    associated with class-number 3.
-    """
+            # Number of images in this batch.
+            num_images = len(images_batch)
 
-    # Load the class-names from the pickled file.
-    raw = _unpickle(filename="batches.meta")[b'label_names']
+            # End-index for the current batch.
+            end = begin + num_images
 
-    # Convert from binary strings.
-    names = [x.decode('utf-8') for x in raw]
+            # Store the images into the array.
+            images[begin:end, :] = images_batch
 
-    return names
+            # Store the class-numbers into the array.
+            cls[begin:end] = cls_batch
 
+            # The begin-index for the next batch is the current end-index.
+            begin = end
 
-def load_training_data():
-    """
-    Load all the training-data for the CIFAR-10 data-set.
+        return images, self._one_hot_encoded(class_numbers=cls, num_classes=self.num_classes)
 
-    The data-set is split into 5 data-files which are merged here.
 
-    Returns the images, class-numbers and one-hot encoded class-labels.
-    """
+    def load_test_data(self):
+        """
+        Load all the test-data for the CIFAR-10 data-set.
 
-    # Pre-allocate the arrays for the images and class-numbers for efficiency.
-    images = np.zeros(shape=[_num_images_train, img_size, img_size, num_channels], dtype=float)
-    cls = np.zeros(shape=[_num_images_train], dtype=int)
+        Returns the images, class-numbers and one-hot encoded class-labels.
+        """
 
-    # Begin-index for the current batch.
-    begin = 0
+        images, cls = self._load_data(filename="test_batch")
 
-    # For each data-file.
-    for i in range(_num_files_train):
-        # Load the images and class-numbers from the data-file.
-        images_batch, cls_batch = _load_data(filename="data_batch_" + str(i + 1))
+        return images, self._one_hot_encoded(class_numbers=cls, num_classes=self.num_classes)
 
-        # Number of images in this batch.
-        num_images = len(images_batch)
+    ########################################################################
 
-        # End-index for the current batch.
-        end = begin + num_images
+    ########################################################################
+    #
+    # Functions for downloading and extracting data-files from the internet.
+    #
+    # Implemented in Python 3.5
+    #
+    ########################################################################
+    #
+    # This file is part of the TensorFlow Tutorials available at:
+    #
+    # https://github.com/Hvass-Labs/TensorFlow-Tutorials
+    #
+    # Published under the MIT License. See the file LICENSE for details.
+    #
+    # Copyright 2016 by Magnus Erik Hvass Pedersen
+    #
+    ########################################################################
 
-        # Store the images into the array.
-        images[begin:end, :] = images_batch
+    import sys
+    import os
+    import urllib.request
+    import tarfile
+    import zipfile
 
-        # Store the class-numbers into the array.
-        cls[begin:end] = cls_batch
+    ########################################################################
 
-        # The begin-index for the next batch is the current end-index.
-        begin = end
 
-    return images, cls, _one_hot_encoded(class_numbers=cls, num_classes=num_classes)
+    def _print_download_progress(self, count, block_size, total_size):
+        """
+        Function used for printing the download progress.
+        Used as a call-back function in maybe_download_and_extract().
+        """
 
+        # Percentage completion.
+        pct_complete = float(count * block_size) / total_size
 
-def load_test_data():
-    """
-    Load all the test-data for the CIFAR-10 data-set.
+        # Status-message. Note the \r which means the line should overwrite itself.
+        msg = "\r- Download progress: {0:.1%}".format(pct_complete)
 
-    Returns the images, class-numbers and one-hot encoded class-labels.
-    """
+        # Print it.
+        sys.stdout.write(msg)
+        sys.stdout.flush()
 
-    images, cls = _load_data(filename="test_batch")
 
-    return images, cls, _one_hot_encoded(class_numbers=cls, num_classes=num_classes)
+    ########################################################################
 
-########################################################################
+
+    def maybe_download_and_extract(self, url, download_dir):
+        """
+        Download and extract the data if it doesn't already exist.
+        Assumes the url is a tar-ball file.
+        :param url:
+            Internet URL for the tar-file to download.
+            Example: "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+        :param download_dir:
+            Directory where the downloaded file is saved.
+            Example: "data/CIFAR-10/"
+        :return:
+            Nothing.
+        """
+
+        # Filename for saving the file downloaded from the internet.
+        # Use the filename from the URL and add it to the download_dir.
+        filename = url.split('/')[-1]
+        file_path = os.path.join(download_dir, filename)
+
+        # Check if the file already exists.
+        # If it exists then we assume it has also been extracted,
+        # otherwise we need to download and extract it now.
+        if not os.path.exists(file_path):
+            # Check if the download directory exists, otherwise create it.
+            if not os.path.exists(download_dir):
+                os.makedirs(download_dir)
+
+            # Download the file from the internet.
+            file_path, _ = urllib.request.urlretrieve(url=url,
+                                                      filename=file_path,
+                                                      reporthook=self._print_download_progress)
+
+            print()
+            print("Download finished. Extracting files.")
+
+            if file_path.endswith(".zip"):
+                # Unpack the zip-file.
+                zipfile.ZipFile(file=file_path, mode="r").extractall(download_dir)
+            elif file_path.endswith((".tar.gz", ".tgz")):
+                # Unpack the tar-ball.
+                tarfile.open(name=file_path, mode="r:gz").extractall(download_dir)
+
+            print("Done.")
+        else:
+            print("Data has apparently already been downloaded and unpacked.")
+
+    ########################################################################
