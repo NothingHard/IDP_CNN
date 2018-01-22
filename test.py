@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from vgg16 import VGG16
-from utils import CIFAR10
+from utils import CIFAR10, CIFAR100
 
 def main():
     parser = argparse.ArgumentParser()
@@ -22,13 +22,13 @@ def main():
 def test(FLAG):
     print("Reading dataset...")
     if FLAG.dataset == 'CIFAR-10':
-        dataset = CIFAR10()
+        dataset = CIFAR10(train=False)
     elif FLAG.dataset == 'CIFAR-100':
-        dataset = CIFAR100()
+        dataset = CIFAR100(train=False)
     else:
         raise ValueError("dataset should be either CIFAR-10 or CIFAR-100.")
 
-    Xtest, Ytest = dataset.load_test_data()
+    Xtest, Ytest = dataset.test_data, dataset.test_labels
 
     print("Build VGG16 models...")
     dp = [(i+1)*0.05 for i in range(1,20)]

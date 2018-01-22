@@ -6,7 +6,7 @@ from progress.bar import Bar
 from ipywidgets import IntProgress
 from IPython.display import display
 from vgg16 import VGG16
-from utils import CIFAR10
+from utils import CIFAR10, CIFAR100
 
 def main()
 	parser = argparse.ArgumentParser()
@@ -23,14 +23,16 @@ def main()
 def train(FLAG):
     print("Reading dataset...")
     if FLAG.dataset is 'CIFAR-10':
-        dataset = CIFAR10()
-    elif: FLAG.dataset is 'CIFAR-100':
-        dataset = CIFAR100()
+        train_data = CIFAR10(train=True)
+        test_data  = CIFAR10(train=False)
+    elif FLAG.dataset is 'CIFAR-100':
+        train_data = CIFAR100(train=True)
+        test_data  = CIFAR100(train=False)
     else:
         raise ValueError("dataset should be either CIFAR-10 or CIFAR-100.")
 
-    Xtrain, Ytrain = dataset.load_training_data()
-    Xtest, Ytest = dataset.load_test_data()
+    Xtrain, Ytrain = train_data.train_data, train_data.train_labels
+    Xtest, Ytest = test_data.test_data, test_data.test_labels
 
     print("Build VGG16 models...")
     dp = [(i+1)*0.05 for i in range(1,20)]
