@@ -6,13 +6,17 @@ import tensorflow as tf
 # VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
 VGG_MEAN = [103.939, 116.779, 123.68] # [B, G, R]
 class VGG16:
-    def __init__(self, vgg16_npy_path):
+    def __init__(self, vgg16_npy_path, infer=False, gamma_trainable=False):
         """
         load pre-trained weights from path
         :param vgg16_npy_path: file path of vgg16 pre-trained weights
         """
         
+        self.infer = infer
+        self.gamma_trainable = gamma_trainable
+
         # load pre-trained weights
+        # if vgg16_npy_path is not None:
         self.data_dict = np.load(vgg16_npy_path,encoding='latin1').item()
         print("npy file loaded")
         
@@ -24,16 +28,16 @@ class VGG16:
         self.prob_dict = {}
         self.loss_dict = {}
         self.accu_dict = {}
-        
-        # input placeholder
-        self.x = tf.placeholder(tf.float32, [None, self.H, self.W, self.C])
-        self.y = tf.placeholder(tf.float32, [None, self.classes])
 
     def build(self, dp, prof_type):
         """
         load variable from npy to build the VGG
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
         """
+
+        # input placeholder
+        self.x = tf.placeholder(tf.float32, [None, self.H, self.W, self.C])
+        self.y = tf.placeholder(tf.float32, [None, self.classes])
         
         self.dp = dp 
         print("Will optimize at DP=", self.dp)
@@ -86,27 +90,27 @@ class VGG16:
         # create operations at every dot product percentages
         for dp_i in dp:
             with tf.name_scope(str(int(dp_i*100))):
-                conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i, prof_type, gamma_trainable=False)
-                conv1_2 = self.idp_conv_layer(conv1_1, "conv1_2", dp_i, prof_type, gamma_trainable=False)
+                conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv1_2 = self.idp_conv_layer(conv1_1, "conv1_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
                 pool1 = self.max_pool(conv1_2, 'pool1')
 
-                conv2_1 = self.idp_conv_layer(  pool1, "conv2_1", dp_i, prof_type, gamma_trainable=False)
-                conv2_2 = self.idp_conv_layer(conv2_1, "conv2_2", dp_i, prof_type, gamma_trainable=False)
+                conv2_1 = self.idp_conv_layer(  pool1, "conv2_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv2_2 = self.idp_conv_layer(conv2_1, "conv2_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
                 pool2 = self.max_pool(conv2_2, 'pool2')
 
-                conv3_1 = self.idp_conv_layer(  pool2, "conv3_1", dp_i, prof_type, gamma_trainable=False)
-                conv3_2 = self.idp_conv_layer(conv3_1, "conv3_2", dp_i, prof_type, gamma_trainable=False)
-                conv3_3 = self.idp_conv_layer(conv3_2, "conv3_3", dp_i, prof_type, gamma_trainable=False)
+                conv3_1 = self.idp_conv_layer(  pool2, "conv3_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv3_2 = self.idp_conv_layer(conv3_1, "conv3_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv3_3 = self.idp_conv_layer(conv3_2, "conv3_3", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
                 pool3 = self.max_pool(conv3_3, 'pool3')
 
-                conv4_1 = self.idp_conv_layer(  pool3, "conv4_1", dp_i, prof_type, gamma_trainable=False)
-                conv4_2 = self.idp_conv_layer(conv4_1, "conv4_2", dp_i, prof_type, gamma_trainable=False)
-                conv4_3 = self.idp_conv_layer(conv4_2, "conv4_3", dp_i, prof_type, gamma_trainable=False)
+                conv4_1 = self.idp_conv_layer(  pool3, "conv4_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv4_2 = self.idp_conv_layer(conv4_1, "conv4_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv4_3 = self.idp_conv_layer(conv4_2, "conv4_3", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
                 pool4 = self.max_pool(conv4_3, 'pool4')
 
-                conv5_1 = self.idp_conv_layer(  pool4, "conv5_1", dp_i, prof_type, gamma_trainable=False)
-                conv5_2 = self.idp_conv_layer(conv5_1, "conv5_2", dp_i, prof_type, gamma_trainable=False)
-                conv5_3 = self.idp_conv_layer(conv5_2, "conv5_3", dp_i, prof_type, gamma_trainable=False)
+                conv5_1 = self.idp_conv_layer(  pool4, "conv5_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv5_2 = self.idp_conv_layer(conv5_1, "conv5_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv5_3 = self.idp_conv_layer(conv5_2, "conv5_3", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
                 pool5 = self.max_pool(conv5_3, 'pool5')
 
                 fc_1 = self.fc_layer(pool5, 'fc_1')
@@ -192,9 +196,16 @@ class VGG16:
             return fc
 
     def get_conv_filter(self, name):
-        return tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
+        if not self.infer:
+            return tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
+        else:
+            return tf.get_variable(shape=self.data_dict[name][0].shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), name=name+"_W", dtype=tf.float32)
     def get_bias(self, name):
-        return tf.get_variable(initializer=self.data_dict[name][1], name=name+"_b")
+        if not self.infer:
+            return tf.get_variable(initializer=self.data_dict[name][1], name=name+"_b")
+        else:
+            return tf.get_variable(shape=self.data_dict[name][1].shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), name=name+"_b", dtype=tf.float32)
+    
 #     def get_fc_weight(self, name):
 #         return tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
 
