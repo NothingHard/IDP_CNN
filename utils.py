@@ -41,7 +41,10 @@ class CIFAR10(object):
         ########################################################################
         # Directory where you want to download and save the data-set.
         # Set this before you start calling any of the functions below.
-        self.data_path = "/home/cmchang/IDP_CNN/data/"
+        self.data_path = "/data/put_data/cmchang/"
+
+        # base folder
+        self.base_folder = "cifar-10-batches-py/"
 
         # URL for the data-set on the internet.
         self.data_url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
@@ -88,16 +91,6 @@ class CIFAR10(object):
     ########################################################################
     # Private functions for downloading, unpacking and loading data-files.
 
-    def _get_file_path(self, filename=""):
-        """
-        Return the full path of a data-file for the data-set.
-
-        If filename=="" then return the directory of the files.
-        """
-
-        return os.path.join(self.data_path, "cifar-10-batches-py/", filename)
-
-
     def _unpickle(self, filename):
         """
         Unpickle the given file and return the data.
@@ -106,7 +99,7 @@ class CIFAR10(object):
         """
 
         # Create full path for the file.
-        file_path = self._get_file_path(filename)
+        file_path = os.path.join(self.data_path, self.base_folder, filename)
 
         print("Loading data: " + file_path)
 
@@ -335,3 +328,4 @@ class CIFAR10(object):
             print("Data has apparently already been downloaded and unpacked.")
 
     ########################################################################
+
