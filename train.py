@@ -9,41 +9,35 @@ from vgg16 import VGG16
 from utils import CIFAR10
 
 def main()
-    def main():
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--save_dir', type=str, default='save',
-						help='directory to store checkpointed models')
-	parser.add_argument('--dim_image', type=int, default=4096,
-						help='dimension of input image')
-	parser.add_argument('--dim_hidden', type=int, default=1000,
-						help='dimension of LSTM hidden state')
-	parser.add_argument('--n_lstm_step', type=int, default=80,
-						help='number of LSTM steps')
-	parser.add_argument('--n_video_step', type=int, default=80,
-						help='number of video steps')
-	parser.add_argument('--n_caption_step', type=int, default=20,
-						help='number of caption steps')
-	parser.add_argument('--n_epoch', type=int, default=1000,
-						help='number of epochs')
-	parser.add_argument('--batch_size', type=int, default=50,
-						help='minibatch size')
-    parser.add_argument('--log_dir', type=str, default='log',
-						help='directory containing log text')
+	parser.add_argument('--save_dir', type=str, default='save', help='directory to store checkpointed models')
+	parser.add_argument('--dataset', type=str, default='CIFAR-10', help='dataset in use')
+    parser.add_argument('--prof_type', type=str, default='all-one', help='type of profile coefficient')
+    parser.add_argument('--atp', type=int, default=0, help='alternative training procedure')
+    parser.add_argument('--log_dir', type=str, default='log', help='directory containing log text')
+    parser.add_argument('--note', type=str, default='', help='argument for taking notes')
 
 	args = parser.parse_args()
 	train(args)
 
 def train(args):
-
     print("Reading dataset...")
-    dataset = CIFAR10()
+    if args.dataset is 'CIFAR-10':
+        dataset = CIFAR10()
+    elif: args.dataset is 'CIFAR-100':
+        dataset = CIFAR100()
+    else:
+        raise ValueError("dataset should be either CIFAR-10 or CIFAR-100.")
+
     Xtrain, Ytrain = dataset.load_training_data()
     Xtest, Ytest = dataset.load_test_data()
 
     print("Build VGG16 models...")
     dp = [(i+1)*0.05 for i in range(1,20)]
     vgg16 = VGG16("/home/cmchang/IDP_CNN/vgg16.npy")
-    vgg16.build(dp=dp, prof_type="all-one")
+
+    # build model using 
+    vgg16.build(dp=dp, prof_type=args.prof_type)
 
     saver = tf.train.Saver(tf.global_variables())
     tasks = ['100', '70', '40', '10']
@@ -60,18 +54,11 @@ def train(args):
         alpha = 0.5
         early_stop_patience = 4
         min_delta = 0.0001
-        
-        # optimizer
-        opt = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
-        
+
         # recorder
         epoch_counter = 0
         
-        # tensorboard writer
-        writer = tf.summary.FileWriter(args.log_dir, sess.graph)
-        
         # progress bar
-
         ptrain = IntProgress()
         pval = IntProgress()
         display(ptrain)
@@ -79,6 +66,12 @@ def train(args):
         ptrain.max = int(Xtrain.shape[0]/batch_size)
         pval.max = int(Xtest.shape[0]/batch_size)
         
+        # optimizer
+        opt = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
+        
+        # tensorboard writer
+        writer = tf.summary.FileWriter(args.log_dir+args.note, sess.graph)
+
         while(len(tasks)):
         
             # acquire a new task
@@ -137,7 +130,7 @@ def train(args):
                 if (current_best_val_loss - val_loss) > min_delta:
                     current_best_val_loss = val_loss
                     patience_counter = 0
-                    checkpoint_path = os.path.join(args.save_dir, 'model.ckpt')
+                    checkpoint_path = os.path.join(args.save_dir+args.note, 'model.ckpt')
                     saver.save(sess, checkpoint_path, global_step=epoch_counter)
                 else:
                     patience_counter += 1
