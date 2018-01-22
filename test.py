@@ -46,12 +46,12 @@ def test(FLAG):
                 sess.run(tf.global_variables())
             print("Initialized")
 
-            output = {}
+            output = []
             for dp_i in dp:
                 accu = sess.run(vgg16.accu_dict[str(int(dp_i*100))], feed_dict={vgg16.x: Xtest[:5000,:], vgg16.y: Ytest[:5000,:]})
-                output[str(int(dp_i*100))] = accu
+                output.append(accu)
                 print("At DP={dp:.4f}, accu={perf:.4f}".format(dp=dp_i, perf=accu))
-            res = pd.DataFrame.from_dict(output)
+            res = pd.DataFrame.from_dict({'DP':[int(dp_i*100) for dp_i in dp],'accu':output})
             res.to_csv(FLAG.output, index=False)
             print("Write into %s" % FLAG.output)
 
