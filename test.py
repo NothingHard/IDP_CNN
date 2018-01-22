@@ -12,15 +12,15 @@ def main()
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--save_dir', type=str, default='save', help='directory to store checkpointed models')
 	parser.add_argument('--dataset', type=str, default='CIFAR-10', help='dataset in use')
-    parser.add_argument('--prof_type', type=str, default='all-one', help='type of profile coefficient')
-    parser.add_argument('--atp', type=int, default=0, help='alternative training procedure')
-    parser.add_argument('--log_dir', type=str, default='log', help='directory containing log text')
-    parser.add_argument('--note', type=str, default='', help='argument for taking notes')
+    # parser.add_argument('--prof_type', type=str, default='all-one', help='type of profile coefficient')
+    # parser.add_argument('--atp', type=int, default=0, help='alternative training procedure')
+    # parser.add_argument('--log_dir', type=str, default='log', help='directory containing log text')
+    # parser.add_argument('--note', type=str, default='', help='argument for taking notes')
 
 	FLAG = parser.parse_args()
-	train(FLAG)
+	test(FLAG)
 
-def train(FLAG):
+def test(FLAG):
     print("Reading dataset...")
     if FLAG.dataset is 'CIFAR-10':
         dataset = CIFAR10()

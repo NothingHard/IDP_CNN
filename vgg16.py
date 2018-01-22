@@ -6,18 +6,13 @@ import tensorflow as tf
 # VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
 VGG_MEAN = [103.939, 116.779, 123.68] # [B, G, R]
 class VGG16:
-    def __init__(self, vgg16_npy_path=None):
+    def __init__(self, vgg16_npy_path):
         """
         load pre-trained weights from path
         :param vgg16_npy_path: file path of vgg16 pre-trained weights
         """
         
         # load pre-trained weights
-        if vgg16_npy_path is None:
-            path = inspect.getfile(Vgg16)
-            path = os.path.abspath(os.path.join(path, os.pardir))
-            vgg16_npy_path = os.path.join(path, "vgg16.npy")
-            print(vgg16_npy_path)     
         self.data_dict = np.load(vgg16_npy_path,encoding='latin1').item()
         print("npy file loaded")
         
@@ -143,7 +138,7 @@ class VGG16:
 
     def idp_conv_layer(self, bottom, name, dp, prof_type, gamma_trainable = False):
         with tf.name_scope(name+str(int(dp*100))):
-            with tf.variable_scope("vgg16",reuse=True):
+            with tf.variable_scope("VGG16",reuse=True):
                 conv_filter = tf.get_variable(name=name+"_W")
                 conv_biases = tf.get_variable(name=name+"_b")
             
@@ -187,7 +182,7 @@ class VGG16:
                 dim *= d
             x = tf.reshape(bottom, [-1, dim])
             
-            with tf.variable_scope("vgg16",reuse=True):
+            with tf.variable_scope("VGG16",reuse=True):
                 weights = tf.get_variable(name=name+"_W")
                 biases = tf.get_variable(name=name+"_b")
 
