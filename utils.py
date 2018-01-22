@@ -1,4 +1,4 @@
-########################################################################
+#######################################################################
 #
 # Functions for downloading the CIFAR-10 data-set from the internet
 # and loading it into memory.
@@ -31,9 +31,9 @@
 # Copyright 2016 by Magnus Erik Hvass Pedersen
 #
 ########################################################################
-
-import numpy as np
+import os
 import pickle
+import numpy as np
 
 class CIFAR10(object):
     def __init__(self):
