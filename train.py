@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 import numpy as np
 import tensorflow as tf
@@ -101,8 +102,8 @@ def train(FLAG):
                 saver.save(sess, checkpoint_path, global_step=epoch_counter)
 
                 # task-wise loss aggregation
-                obj = tf.add(tf.multiply(1-alpha,obj), tf.multiply(alpha,new_obj))
-
+                # obj = tf.add(tf.multiply(1-alpha,obj), tf.multiply(alpha,new_obj))
+                obj = tf.add(obj, new_obj)
             # optimizer
             train_op = opt.minimize(obj)
 
