@@ -34,7 +34,7 @@ class VGG16:
         self.loss_dict = {}
         self.accu_dict = {}
 
-    def build(self, dp, prof_type):
+    def build(self, dp):
         """
         load variable from npy to build the VGG
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
