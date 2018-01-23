@@ -6,7 +6,7 @@ import tensorflow as tf
 # VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
 VGG_MEAN = [103.939, 116.779, 123.68] # [B, G, R]
 class VGG16:
-    def __init__(self, vgg16_npy_path, prof_type=None, infer=False, gamma_trainable=False):
+    def __init__(self, vgg16_npy_path, prof_type=None, infer=False):
         """
         load pre-trained weights from path
         :param vgg16_npy_path: file path of vgg16 pre-trained weights
@@ -14,7 +14,7 @@ class VGG16:
         
         self.infer = infer
         self.gamma_var = []
-        self.gamma_trainable = gamma_trainable
+
         if prof_type is None:
             self.prof_type = "all-one"
         else:
@@ -116,27 +116,27 @@ class VGG16:
         # create operations at every dot product percentages
         for dp_i in dp:
             with tf.name_scope(str(int(dp_i*100))):
-                conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i, gamma_trainable=self.gamma_trainable)
-                conv1_2 = self.idp_conv_layer(conv1_1, "conv1_2", dp_i, gamma_trainable=self.gamma_trainable)
+                conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i)
+                conv1_2 = self.idp_conv_layer(conv1_1, "conv1_2", dp_i)
                 pool1 = self.max_pool(conv1_2, 'pool1')
 
-                conv2_1 = self.idp_conv_layer(  pool1, "conv2_1", dp_i, gamma_trainable=self.gamma_trainable)
-                conv2_2 = self.idp_conv_layer(conv2_1, "conv2_2", dp_i, gamma_trainable=self.gamma_trainable)
+                conv2_1 = self.idp_conv_layer(  pool1, "conv2_1", dp_i)
+                conv2_2 = self.idp_conv_layer(conv2_1, "conv2_2", dp_i)
                 pool2 = self.max_pool(conv2_2, 'pool2')
 
-                conv3_1 = self.idp_conv_layer(  pool2, "conv3_1", dp_i, gamma_trainable=self.gamma_trainable)
-                conv3_2 = self.idp_conv_layer(conv3_1, "conv3_2", dp_i, gamma_trainable=self.gamma_trainable)
-                conv3_3 = self.idp_conv_layer(conv3_2, "conv3_3", dp_i, gamma_trainable=self.gamma_trainable)
+                conv3_1 = self.idp_conv_layer(  pool2, "conv3_1", dp_i)
+                conv3_2 = self.idp_conv_layer(conv3_1, "conv3_2", dp_i)
+                conv3_3 = self.idp_conv_layer(conv3_2, "conv3_3", dp_i)
                 pool3 = self.max_pool(conv3_3, 'pool3')
 
-                conv4_1 = self.idp_conv_layer(  pool3, "conv4_1", dp_i, gamma_trainable=self.gamma_trainable)
-                conv4_2 = self.idp_conv_layer(conv4_1, "conv4_2", dp_i, gamma_trainable=self.gamma_trainable)
-                conv4_3 = self.idp_conv_layer(conv4_2, "conv4_3", dp_i, gamma_trainable=self.gamma_trainable)
+                conv4_1 = self.idp_conv_layer(  pool3, "conv4_1", dp_i)
+                conv4_2 = self.idp_conv_layer(conv4_1, "conv4_2", dp_i)
+                conv4_3 = self.idp_conv_layer(conv4_2, "conv4_3", dp_i)
                 pool4 = self.max_pool(conv4_3, 'pool4')
 
-                conv5_1 = self.idp_conv_layer(  pool4, "conv5_1", dp_i, gamma_trainable=self.gamma_trainable)
-                conv5_2 = self.idp_conv_layer(conv5_1, "conv5_2", dp_i, gamma_trainable=self.gamma_trainable)
-                conv5_3 = self.idp_conv_layer(conv5_2, "conv5_3", dp_i, gamma_trainable=self.gamma_trainable)
+                conv5_1 = self.idp_conv_layer(  pool4, "conv5_1", dp_i)
+                conv5_2 = self.idp_conv_layer(conv5_1, "conv5_2", dp_i)
+                conv5_3 = self.idp_conv_layer(conv5_2, "conv5_3", dp_i)
                 pool5 = self.max_pool(conv5_3, 'pool5')
 
                 fc_1 = self.fc_layer(pool5, 'fc_1')
@@ -166,7 +166,7 @@ class VGG16:
     def max_pool(self, bottom, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
-    def idp_conv_layer(self, bottom, name, dp, gamma_trainable = False):
+    def idp_conv_layer(self, bottom, name, dp):
         with tf.name_scope(name+str(int(dp*100))):
             with tf.variable_scope("VGG16",reuse=True):
                 conv_filter = tf.get_variable(name=name+"_W")
@@ -174,9 +174,6 @@ class VGG16:
                 conv_gamma  = tf.get_variable(name=name+"_gamma")
             
             H,W,C,O = conv_filter.get_shape().as_list()
-        
-            # get profile
-            # profile = self.get_profile(O, prof_type)
             
             # create a mask determined by the dot product percentage
             n1 = int(O * dp)
@@ -187,10 +184,6 @@ class VGG16:
             # create a profile coefficient, gamma
             filter_profile = tf.stack([profile for i in range(H*W*C)])
             filter_profile = tf.reshape(filter_profile, shape=(H, W, C, O))
-            
-            # gamma in use
-            # gamma_W = tf.Variable(initial_value=filter_profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
-            # gamma_b = tf.Variable(initial_value=profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
 
             # IDP conv2d output
             conv_filter = tf.multiply(conv_filter, filter_profile)
