@@ -47,7 +47,7 @@ def train(FLAG):
     
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=len(tasks))
     
-    checkpoint_path = os.path.join('/data/put_data/cmchang/save_linear_no_alpha/', 'model.ckpt')
+    checkpoint_path = os.path.join(FLAG.save_dir, 'model.ckpt')
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -66,7 +66,7 @@ def train(FLAG):
         epoch_counter = 0
 
         # tensorboard writer
-        writer = tf.summary.FileWriter("log/", sess.graph)
+        writer = tf.summary.FileWriter(FLAG.log_dir, sess.graph)
 
         # progress bar
         ptrain = IntProgress()
