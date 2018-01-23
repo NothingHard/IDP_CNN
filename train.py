@@ -1,3 +1,4 @@
+import os
 import argparse
 import numpy as np
 import tensorflow as tf
@@ -22,10 +23,10 @@ def main():
 
 def train(FLAG):
     print("Reading dataset...")
-    if FLAG.dataset is 'CIFAR-10':
+    if FLAG.dataset == 'CIFAR-10':
         train_data = CIFAR10(train=True)
         test_data  = CIFAR10(train=False)
-    elif FLAG.dataset is 'CIFAR-100':
+    elif FLAG.dataset == 'CIFAR-100':
         train_data = CIFAR100(train=True)
         test_data  = CIFAR100(train=False)
     else:
@@ -159,3 +160,6 @@ def train(FLAG):
                 print("Epoch %s (%s), %s sec >> obj loss: %.4f, task at %s: %.4f" % (epoch_counter, patience_counter, round(time.time()-stime,2), val_loss, cur_task, val_accu))
 
         writer.close()
+
+if __name__ == '__main__':
+	main()

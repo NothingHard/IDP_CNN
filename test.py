@@ -32,8 +32,8 @@ def test(FLAG):
 
     print("Build VGG16 models...")
     dp = [(i+1)*0.05 for i in range(1,20)]
-    vgg16 = VGG16("/home/cmchang/IDP_CNN/vgg16.npy", infer=True)
-    vgg16.build(dp=dp, prof_type=FLAG.prof_type)
+    vgg16 = VGG16("/home/cmchang/IDP_CNN/vgg16.npy", infer=True, prof_type=FLAG.prof_type)
+    vgg16.build(dp=dp)
 
     with tf.Session() as sess:
         if FLAG.save_dir is not None:

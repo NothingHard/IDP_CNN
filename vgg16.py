@@ -179,7 +179,7 @@ class VGG16:
             n1 = int(O * dp)
             n0 = O - n1
             mask = tf.constant(value=np.append(np.ones(n1, dtype='float32'), np.zeros(n0, dtype='float32')), dtype=tf.float32)
-            profile = tf.multiply(conv_gamma), mask)
+            profile = tf.multiply(conv_gamma, mask)
 
             # create a profile coefficient, gamma
             filter_profile = tf.stack([profile for i in range(H*W*C)])
