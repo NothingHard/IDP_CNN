@@ -67,43 +67,43 @@ class VGG16:
         with tf.variable_scope("VGG16"):
             
             # transfer Convolutional filters trained on ImageNet to our model
-            self.conv1_1_W, gamma, self.conv1_1_b = self.get_conv_filter("conv1_1"), self.get_bias("conv1_1")
+            (self.conv1_1_W, gamma), self.conv1_1_b = self.get_conv_filter("conv1_1"), self.get_bias("conv1_1")
             self.gamma_var.append(gamma)
 
-            self.conv1_2_W, gamma, self.conv1_2_b = self.get_conv_filter("conv1_2"), self.get_bias("conv1_2")
+            (self.conv1_2_W, gamma), self.conv1_2_b = self.get_conv_filter("conv1_2"), self.get_bias("conv1_2")
             self.gamma_var.append(gamma)
 
-            self.conv2_1_W, gamma, self.conv2_1_b = self.get_conv_filter("conv2_1"), self.get_bias("conv2_1")
+            (self.conv2_1_W, gamma), self.conv2_1_b = self.get_conv_filter("conv2_1"), self.get_bias("conv2_1")
             self.gamma_var.append(gamma)
 
-            self.conv2_2_W, gamma, self.conv2_2_b = self.get_conv_filter("conv2_2"), self.get_bias("conv2_2")
+            (self.conv2_2_W, gamma), self.conv2_2_b = self.get_conv_filter("conv2_2"), self.get_bias("conv2_2")
             self.gamma_var.append(gamma)
 
-            self.conv3_1_W, gamma, self.conv3_1_b = self.get_conv_filter("conv3_1"), self.get_bias("conv3_1")
+            (self.conv3_1_W, gamma), self.conv3_1_b = self.get_conv_filter("conv3_1"), self.get_bias("conv3_1")
             self.gamma_var.append(gamma)
 
-            self.conv3_2_W, gamma, self.conv3_2_b = self.get_conv_filter("conv3_2"), self.get_bias("conv3_2")
+            (self.conv3_2_W, gamma), self.conv3_2_b = self.get_conv_filter("conv3_2"), self.get_bias("conv3_2")
             self.gamma_var.append(gamma)
 
-            self.conv3_3_W, gamma, self.conv3_3_b = self.get_conv_filter("conv3_3"), self.get_bias("conv3_3")
+            (self.conv3_3_W, gamma), self.conv3_3_b = self.get_conv_filter("conv3_3"), self.get_bias("conv3_3")
             self.gamma_var.append(gamma)
 
-            self.conv4_1_W, gamma, self.conv4_1_b = self.get_conv_filter("conv4_1"), self.get_bias("conv4_1")
+            (self.conv4_1_W, gamma), self.conv4_1_b = self.get_conv_filter("conv4_1"), self.get_bias("conv4_1")
             self.gamma_var.append(gamma)
 
-            self.conv4_2_W, gamma, self.conv4_2_b = self.get_conv_filter("conv4_2"), self.get_bias("conv4_2")
+            (self.conv4_2_W, gamma), self.conv4_2_b = self.get_conv_filter("conv4_2"), self.get_bias("conv4_2")
             self.gamma_var.append(gamma)
 
-            self.conv4_3_W, gamma, self.conv4_3_b = self.get_conv_filter("conv4_3"), self.get_bias("conv4_3")
+            (self.conv4_3_W, gamma), self.conv4_3_b = self.get_conv_filter("conv4_3"), self.get_bias("conv4_3")
             self.gamma_var.append(gamma)
 
-            self.conv5_1_W, gamma, self.conv5_1_b = self.get_conv_filter("conv5_1"), self.get_bias("conv5_1")
+            (self.conv5_1_W, gamma), self.conv5_1_b = self.get_conv_filter("conv5_1"), self.get_bias("conv5_1")
             self.gamma_var.append(gamma)
 
-            self.conv5_2_W, gamma, self.conv5_2_b = self.get_conv_filter("conv5_2"), self.get_bias("conv5_2")
+            (self.conv5_2_W, gamma), self.conv5_2_b = self.get_conv_filter("conv5_2"), self.get_bias("conv5_2")
             self.gamma_var.append(gamma)
 
-            self.conv5_3_W, gamma, self.conv5_3_b = self.get_conv_filter("conv5_3"), self.get_bias("conv5_3")
+            (self.conv5_3_W, gamma), self.conv5_3_b = self.get_conv_filter("conv5_3"), self.get_bias("conv5_3")
             self.gamma_var.append(gamma)
 
             # user specified fully connected layers
@@ -182,7 +182,7 @@ class VGG16:
             n1 = int(O * dp)
             n0 = O - n1
             mask = tf.constant(value=np.append(np.ones(n1, dtype='float32'), np.zeros(n0, dtype='float32')), dtype=tf.float32)
-            profile = tf.multiply(conv_gamma, mask)
+            profile = tf.multiply(conv_gamma), mask)
 
             # create a profile coefficient, gamma
             filter_profile = tf.stack([profile for i in range(H*W*C)])
