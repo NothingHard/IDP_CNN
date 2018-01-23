@@ -6,18 +6,20 @@ import tensorflow as tf
 # VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
 VGG_MEAN = [103.939, 116.779, 123.68] # [B, G, R]
 class VGG16:
-    def __init__(self, vgg16_npy_path, infer=False, gamma_trainable=False):
+    def __init__(self, vgg16_npy_path, prof_type=prof_type, infer=False, gamma_trainable=False):
         """
         load pre-trained weights from path
         :param vgg16_npy_path: file path of vgg16 pre-trained weights
         """
         
         self.infer = infer
+        self.gamma_var = []
         self.gamma_trainable = gamma_trainable
+        self.prof_type = prof_type
 
         # load pre-trained weights
         # if vgg16_npy_path is not None:
-        self.data_dict = np.load(vgg16_npy_path,encoding='latin1').item()
+        self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
         print("npy file loaded")
         
         # input information
@@ -53,8 +55,8 @@ class VGG16:
         assert  blue.get_shape().as_list()[1:] == [self.H, self.W, 1]
         self.x = tf.concat(axis=3, values=[
               blue - VGG_MEAN[0],
-            green - VGG_MEAN[1],
-             red - VGG_MEAN[2],
+             green - VGG_MEAN[1],
+               red - VGG_MEAN[2],
         ])
         assert self.x.get_shape().as_list()[1:] == [self.H, self.W, self.C]
         
@@ -62,23 +64,44 @@ class VGG16:
         with tf.variable_scope("VGG16"):
             
             # transfer Convolutional filters trained on ImageNet to our model
-            self.conv1_1_W, self.conv1_1_b = self.get_conv_filter("conv1_1"), self.get_bias("conv1_1")
-            self.conv1_2_W, self.conv1_2_b = self.get_conv_filter("conv1_2"), self.get_bias("conv1_2")
+            self.conv1_1_W, gamma, self.conv1_1_b = self.get_conv_filter("conv1_1"), self.get_bias("conv1_1")
+            self.gamma_var.append(gamma)
 
-            self.conv2_1_W, self.conv2_1_b = self.get_conv_filter("conv2_1"), self.get_bias("conv2_1")
-            self.conv2_2_W, self.conv2_2_b = self.get_conv_filter("conv2_2"), self.get_bias("conv2_2")
+            self.conv1_2_W, gamma, self.conv1_2_b = self.get_conv_filter("conv1_2"), self.get_bias("conv1_2")
+            self.gamma_var.append(gamma)
 
-            self.conv3_1_W, self.conv3_1_b = self.get_conv_filter("conv3_1"), self.get_bias("conv3_1")
-            self.conv3_2_W, self.conv3_2_b = self.get_conv_filter("conv3_2"), self.get_bias("conv3_2")
-            self.conv3_3_W, self.conv3_3_b = self.get_conv_filter("conv3_3"), self.get_bias("conv3_3")
+            self.conv2_1_W, gamma, self.conv2_1_b = self.get_conv_filter("conv2_1"), self.get_bias("conv2_1")
+            self.gamma_var.append(gamma)
 
-            self.conv4_1_W, self.conv4_1_b = self.get_conv_filter("conv4_1"), self.get_bias("conv4_1")
-            self.conv4_2_W, self.conv4_2_b = self.get_conv_filter("conv4_2"), self.get_bias("conv4_2")
-            self.conv4_3_W, self.conv4_3_b = self.get_conv_filter("conv4_3"), self.get_bias("conv4_3")
+            self.conv2_2_W, gamma, self.conv2_2_b = self.get_conv_filter("conv2_2"), self.get_bias("conv2_2")
+            self.gamma_var.append(gamma)
 
-            self.conv5_1_W, self.conv5_1_b = self.get_conv_filter("conv5_1"), self.get_bias("conv5_1")
-            self.conv5_2_W, self.conv5_2_b = self.get_conv_filter("conv5_2"), self.get_bias("conv5_2")
-            self.conv5_3_W, self.conv5_3_b = self.get_conv_filter("conv5_3"), self.get_bias("conv5_3")
+            self.conv3_1_W, gamma, self.conv3_1_b = self.get_conv_filter("conv3_1"), self.get_bias("conv3_1")
+            self.gamma_var.append(gamma)
+
+            self.conv3_2_W, gamma, self.conv3_2_b = self.get_conv_filter("conv3_2"), self.get_bias("conv3_2")
+            self.gamma_var.append(gamma)
+
+            self.conv3_3_W, gamma, self.conv3_3_b = self.get_conv_filter("conv3_3"), self.get_bias("conv3_3")
+            self.gamma_var.append(gamma)
+
+            self.conv4_1_W, gamma, self.conv4_1_b = self.get_conv_filter("conv4_1"), self.get_bias("conv4_1")
+            self.gamma_var.append(gamma)
+
+            self.conv4_2_W, gamma, self.conv4_2_b = self.get_conv_filter("conv4_2"), self.get_bias("conv4_2")
+            self.gamma_var.append(gamma)
+
+            self.conv4_3_W, gamma, self.conv4_3_b = self.get_conv_filter("conv4_3"), self.get_bias("conv4_3")
+            self.gamma_var.append(gamma)
+
+            self.conv5_1_W, gamma, self.conv5_1_b = self.get_conv_filter("conv5_1"), self.get_bias("conv5_1")
+            self.gamma_var.append(gamma)
+
+            self.conv5_2_W, gamma, self.conv5_2_b = self.get_conv_filter("conv5_2"), self.get_bias("conv5_2")
+            self.gamma_var.append(gamma)
+
+            self.conv5_3_W, gamma, self.conv5_3_b = self.get_conv_filter("conv5_3"), self.get_bias("conv5_3")
+            self.gamma_var.append(gamma)
 
             # user specified fully connected layers
             self.fc_1_W = tf.get_variable(name="fc_1_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
@@ -90,27 +113,27 @@ class VGG16:
         # create operations at every dot product percentages
         for dp_i in dp:
             with tf.name_scope(str(int(dp_i*100))):
-                conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv1_2 = self.idp_conv_layer(conv1_1, "conv1_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv1_1 = self.idp_conv_layer( self.x, "conv1_1", dp_i, gamma_trainable=self.gamma_trainable)
+                conv1_2 = self.idp_conv_layer(conv1_1, "conv1_2", dp_i, gamma_trainable=self.gamma_trainable)
                 pool1 = self.max_pool(conv1_2, 'pool1')
 
-                conv2_1 = self.idp_conv_layer(  pool1, "conv2_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv2_2 = self.idp_conv_layer(conv2_1, "conv2_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv2_1 = self.idp_conv_layer(  pool1, "conv2_1", dp_i, gamma_trainable=self.gamma_trainable)
+                conv2_2 = self.idp_conv_layer(conv2_1, "conv2_2", dp_i, gamma_trainable=self.gamma_trainable)
                 pool2 = self.max_pool(conv2_2, 'pool2')
 
-                conv3_1 = self.idp_conv_layer(  pool2, "conv3_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv3_2 = self.idp_conv_layer(conv3_1, "conv3_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv3_3 = self.idp_conv_layer(conv3_2, "conv3_3", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv3_1 = self.idp_conv_layer(  pool2, "conv3_1", dp_i, gamma_trainable=self.gamma_trainable)
+                conv3_2 = self.idp_conv_layer(conv3_1, "conv3_2", dp_i, gamma_trainable=self.gamma_trainable)
+                conv3_3 = self.idp_conv_layer(conv3_2, "conv3_3", dp_i, gamma_trainable=self.gamma_trainable)
                 pool3 = self.max_pool(conv3_3, 'pool3')
 
-                conv4_1 = self.idp_conv_layer(  pool3, "conv4_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv4_2 = self.idp_conv_layer(conv4_1, "conv4_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv4_3 = self.idp_conv_layer(conv4_2, "conv4_3", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv4_1 = self.idp_conv_layer(  pool3, "conv4_1", dp_i, gamma_trainable=self.gamma_trainable)
+                conv4_2 = self.idp_conv_layer(conv4_1, "conv4_2", dp_i, gamma_trainable=self.gamma_trainable)
+                conv4_3 = self.idp_conv_layer(conv4_2, "conv4_3", dp_i, gamma_trainable=self.gamma_trainable)
                 pool4 = self.max_pool(conv4_3, 'pool4')
 
-                conv5_1 = self.idp_conv_layer(  pool4, "conv5_1", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv5_2 = self.idp_conv_layer(conv5_1, "conv5_2", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
-                conv5_3 = self.idp_conv_layer(conv5_2, "conv5_3", dp_i, prof_type, gamma_trainable=self.gamma_trainable)
+                conv5_1 = self.idp_conv_layer(  pool4, "conv5_1", dp_i, gamma_trainable=self.gamma_trainable)
+                conv5_2 = self.idp_conv_layer(conv5_1, "conv5_2", dp_i, gamma_trainable=self.gamma_trainable)
+                conv5_3 = self.idp_conv_layer(conv5_2, "conv5_3", dp_i, gamma_trainable=self.gamma_trainable)
                 pool5 = self.max_pool(conv5_3, 'pool5')
 
                 fc_1 = self.fc_layer(pool5, 'fc_1')
@@ -140,37 +163,35 @@ class VGG16:
     def max_pool(self, bottom, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
-    def idp_conv_layer(self, bottom, name, dp, prof_type, gamma_trainable = False):
+    def idp_conv_layer(self, bottom, name, dp, gamma_trainable = False):
         with tf.name_scope(name+str(int(dp*100))):
             with tf.variable_scope("VGG16",reuse=True):
                 conv_filter = tf.get_variable(name=name+"_W")
                 conv_biases = tf.get_variable(name=name+"_b")
+                conv_gamma  = tf.get_variable(name=name+"_gamma")
             
             H,W,C,O = conv_filter.get_shape().as_list()
         
             # get profile
-            profile = self.get_profile(O, prof_type)
+            # profile = self.get_profile(O, prof_type)
             
             # create a mask determined by the dot product percentage
             n1 = int(O * dp)
             n0 = O - n1
-            mask = np.append(np.ones(n1, dtype='float32'), np.zeros(n0, dtype='float32'))
-            if len(profile) == len(mask):
-                profile *= mask
-            else:
-                raise ValueError("profile and mask must have the same shape.")
+            mask = tf.constant(value=np.append(np.ones(n1, dtype='float32'), np.zeros(n0, dtype='float32')), dtype=tf.float32)
+            profile = tf.multiply(conv_gamma, mask)
 
             # create a profile coefficient, gamma
-            filter_profile = np.stack([profile for i in range(H*W*C)])
-            filter_profile = np.reshape(filter_profile, newshape=(H, W, C, O))
+            filter_profile = tf.stack([profile for i in range(H*W*C)])
+            filter_profile = tf.reshape(filter_profile, shape=(H, W, C, O))
             
             # gamma in use
-            gamma_W = tf.Variable(initial_value=filter_profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
-            gamma_b = tf.Variable(initial_value=profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
+            # gamma_W = tf.Variable(initial_value=filter_profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
+            # gamma_b = tf.Variable(initial_value=profile, name=name+"_gamma_W_"+str(int(dp*100)), trainable=gamma_trainable)
 
             # IDP conv2d output
-            conv_filter = tf.multiply(conv_filter, gamma_W)
-            conv_biases = tf.multiply(conv_biases, gamma_b)
+            conv_filter = tf.multiply(conv_filter, filter_profile)
+            conv_biases = tf.multiply(conv_biases, profile)
             
             conv = tf.nn.conv2d(bottom, conv_filter, [1, 1, 1, 1], padding='SAME')
             conv = tf.nn.bias_add(conv, conv_biases)
@@ -190,14 +211,16 @@ class VGG16:
                 weights = tf.get_variable(name=name+"_W")
                 biases = tf.get_variable(name=name+"_b")
 
-            # Fully connected layer. Note that the '+' operation automatically
-            # broadcasts the biases.
+            # Fully connected layer. Note that the '+' operation automatically broadcasts the biases.
             fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
             return fc
 
     def get_conv_filter(self, name):
         if not self.infer:
-            return tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
+            conv_filter = tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
+            H,W,C,O = conv_filter.get_shape().as_list()
+            gamma = tf.get_variable(initializer=self.get_profile(O, self.prof_type), name=name+"_gamma")
+            return conv_filter, gamma
         else:
             return tf.get_variable(shape=self.data_dict[name][0].shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), name=name+"_W", dtype=tf.float32)
     def get_bias(self, name):
@@ -205,9 +228,6 @@ class VGG16:
             return tf.get_variable(initializer=self.data_dict[name][1], name=name+"_b")
         else:
             return tf.get_variable(shape=self.data_dict[name][1].shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), name=name+"_b", dtype=tf.float32)
-    
-#     def get_fc_weight(self, name):
-#         return tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
 
     def get_profile(self, C, prof_type):
         def half_exp(n, k=1, dtype='float32'):
