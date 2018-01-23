@@ -37,10 +37,10 @@ def train(FLAG):
     Xtest, Ytest = test_data.test_data, test_data.test_labels
 
     print("Build VGG16 models...")
-    dp = [(i+1)*0.05 for i in range(1,20)]
     vgg16 = VGG16("/home/cmchang/IDP_CNN/vgg16.npy", prof_type=FLAG.prof_type)
 
     # build model using  dp
+    dp = [(i+1)*0.05 for i in range(1,20)]
     vgg16.build(dp=dp)
 
     # define tasks
@@ -50,6 +50,11 @@ def train(FLAG):
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=len(tasks))
     
     checkpoint_path = os.path.join(FLAG.save_dir, 'model.ckpt')
+
+    tvars_trainable = tf.trainable_variables()
+    for rm in vgg16.gamma_vars:
+        tvars_trainable.remove(rm)
+        print('%s is not trainable.'% rm)
 
     # useful function
     def initialize_uninitialized(sess):
@@ -105,7 +110,7 @@ def train(FLAG):
                 # obj = tf.add(tf.multiply(1-alpha,obj), tf.multiply(alpha,new_obj))
                 obj = tf.add(obj, new_obj)
             # optimizer
-            train_op = opt.minimize(obj)
+            train_op = opt.minimize(obj, var_list=tvars_trainable)
 
             # re-initialize
             initialize_uninitialized(sess)
