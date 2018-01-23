@@ -52,7 +52,7 @@ def train(FLAG):
     checkpoint_path = os.path.join(FLAG.save_dir, 'model.ckpt')
 
     tvars_trainable = tf.trainable_variables()
-    for rm in vgg16.gamma_vars:
+    for rm in vgg16.gamma_var:
         tvars_trainable.remove(rm)
         print('%s is not trainable.'% rm)
 
