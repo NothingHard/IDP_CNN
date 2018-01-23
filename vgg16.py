@@ -6,7 +6,7 @@ import tensorflow as tf
 # VGG_MEAN = [123.68, 116.779, 103.939] # [R, G, B]
 VGG_MEAN = [103.939, 116.779, 123.68] # [B, G, R]
 class VGG16:
-    def __init__(self, vgg16_npy_path, prof_type=prof_type, infer=False, gamma_trainable=False):
+    def __init__(self, vgg16_npy_path, prof_type=None, infer=False, gamma_trainable=False):
         """
         load pre-trained weights from path
         :param vgg16_npy_path: file path of vgg16 pre-trained weights
@@ -15,7 +15,10 @@ class VGG16:
         self.infer = infer
         self.gamma_var = []
         self.gamma_trainable = gamma_trainable
-        self.prof_type = prof_type
+        if prof_type is None:
+            self.prof_type = "all-one"
+        else:
+            self.prof_type = prof_type
 
         # load pre-trained weights
         # if vgg16_npy_path is not None:
