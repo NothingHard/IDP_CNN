@@ -221,11 +221,12 @@ class VGG16:
     def get_conv_filter(self, name):
         if not self.infer:
             conv_filter = tf.get_variable(initializer=self.data_dict[name][0], name=name+"_W")
-            H,W,C,O = conv_filter.get_shape().as_list()
-            gamma = tf.get_variable(initializer=self.get_profile(O, self.prof_type), name=name+"_gamma")
-            return conv_filter, gamma
         else:
-            return tf.get_variable(shape=self.data_dict[name][0].shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), name=name+"_W", dtype=tf.float32)
+            conv_filter = tf.get_variable(shape=self.data_dict[name][0].shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), name=name+"_W", dtype=tf.float32)
+        H,W,C,O = conv_filter.get_shape().as_list()
+        gamma = tf.get_variable(initializer=self.get_profile(O, self.prof_type), name=name+"_gamma")
+        return conv_filter, gamma
+
     def get_bias(self, name):
         if not self.infer:
             return tf.get_variable(initializer=self.data_dict[name][1], name=name+"_b")
