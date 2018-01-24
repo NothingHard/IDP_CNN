@@ -108,10 +108,10 @@ class VGG16:
 
             # user specified fully connected layers
             self.fc_1_W = tf.get_variable(name="fc_1_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
-            self.fc_1_b = tf.get_variable(name="fc_1_b", shape=(512), initializer=tf.ones_initializer(), dtype=tf.float32)
+            self.fc_1_b = tf.get_variable(name="fc_1_b", shape=(512,), initializer=tf.ones_initializer(), dtype=tf.float32)
 
             self.fc_2_W = tf.get_variable(name="fc_2_W", shape=(512, 10), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
-            self.fc_2_b = tf.get_variable(name="fc_2_b", shape=(10), initializer=tf.ones_initializer(), dtype=tf.float32)
+            self.fc_2_b = tf.get_variable(name="fc_2_b", shape=(10,), initializer=tf.ones_initializer(), dtype=tf.float32)
         
         # create operations at every dot product percentages
         for dp_i in dp:
