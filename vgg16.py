@@ -217,7 +217,7 @@ class VGG16:
         else:
             conv_filter = tf.get_variable(shape=self.data_dict[name][0].shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), name=name+"_W", dtype=tf.float32)
         H,W,C,O = conv_filter.get_shape().as_list()
-        gamma = tf.get_variable(initializer=self.get_profile(O, self.prof_type), name=name+"_gamma")
+        gamma = tf.get_variable(initializer=self.get_profile(O, self.prof_type), name=name+"_gamma", dtype=tf.float32)
         return conv_filter, gamma
 
     def get_bias(self, name):
@@ -238,7 +238,7 @@ class VGG16:
         elif prof_type == "half-exp":
             profile = half_exp(C, 2.0)
         elif prof_type == "harmonic":
-            profile = np.array(1.0/(np.arange(C)+1))
+            profile = np.array(1.0/(np.arange(C)+1), dtype='float32')
         else:
             raise ValueError("prof_type must be \"all-one\", \"half-exp\", \"harmonic\" or \"linear\".")
         return profile
