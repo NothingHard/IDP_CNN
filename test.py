@@ -8,6 +8,7 @@ from utils import CIFAR10, CIFAR100
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--init_from', type=str, default='vgg16.npy', help='pre-trained weights')
     parser.add_argument('--save_dir', type=str, default='save', help='directory to store checkpointed models')
     parser.add_argument('--dataset', type=str, default='CIFAR-10', help='dataset in use')
     parser.add_argument('--prof_type', type=str, default='all-one', help='type of profile coefficient')
@@ -32,7 +33,7 @@ def test(FLAG):
 
     print("Build VGG16 models...")
     dp = [(i+1)*0.05 for i in range(1,20)]
-    vgg16 = VGG16("/home/cmchang/IDP_CNN/vgg16.npy", infer=True, prof_type=FLAG.prof_type)
+    vgg16 = VGG16(FLAG.init_from, infer=True, prof_type=FLAG.prof_type)
     vgg16.build(dp=dp)
 
     with tf.Session() as sess:
@@ -49,8 +50,9 @@ def test(FLAG):
             output = []
             for dp_i in dp:
                 accu = sess.run(vgg16.accu_dict[str(int(dp_i*100))], feed_dict={vgg16.x: Xtest[:5000,:], vgg16.y: Ytest[:5000,:]})
-                output.append(accu)
-                print("At DP={dp:.4f}, accu={perf:.4f}".format(dp=dp_i, perf=accu))
+                accu2 = sess.run(vgg16.accu_dict[str(int(dp_i*100))], feed_dict={vgg16.x: Xtest[5000:,:], vgg16.y: Ytest[5000:,:]})
+                output.append((accu+accu2)/2)
+                print("At DP={dp:.4f}, accu={perf:.4f}".format(dp=dp_i, perf=(accu+accu2)/2))
             res = pd.DataFrame.from_dict({'DP':[int(dp_i*100) for dp_i in dp],'accu':output})
             res.to_csv(FLAG.output, index=False)
             print("Write into %s" % FLAG.output)
