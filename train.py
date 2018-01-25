@@ -12,6 +12,7 @@ from utils import CIFAR10, CIFAR100
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--init_from', type=str, default='vgg16.npy', help='pre-trained weights')
     parser.add_argument('--save_dir', type=str, default='save', help='directory to store checkpointed models')
     parser.add_argument('--dataset', type=str, default='CIFAR-10', help='dataset in use')
     parser.add_argument('--prof_type', type=str, default='all-one', help='type of profile coefficient')
@@ -37,7 +38,7 @@ def train(FLAG):
     Xtest, Ytest = test_data.test_data, test_data.test_labels
 
     print("Build VGG16 models...")
-    vgg16 = VGG16("/home/cmchang/IDP_CNN/vgg16.npy", prof_type=FLAG.prof_type)
+    vgg16 = VGG16(FLAG.init_from, prof_type=FLAG.prof_type)
 
     # build model using  dp
     dp = [(i+1)*0.05 for i in range(1,20)]
