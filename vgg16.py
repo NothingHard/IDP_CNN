@@ -69,7 +69,7 @@ class VGG16:
         # declare and initialize the weights of VGG16
         with tf.variable_scope("VGG16"):
             for k, v in sorted(self.data_dict.items()):
-                if 'conv' in k:
+                if 'conv' in k and 'gamma' not in k:
                     # transfer Convolutional filters trained on ImageNet to our model
                     (conv_filter, gamma), conv_bias = self.get_conv_filter(k), self.get_bias(k)
                     self.para_dict[k] = [conv_filter, conv_bias]
@@ -115,7 +115,8 @@ class VGG16:
             # self.gamma_var.append(gamma)
 
             # user specified fully connected layers
-            fc_W = tf.get_variable(name="fc_1_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
+            # TEMPORARY from 512 to 25 
+            fc_W = tf.get_variable(name="fc_1_W", shape=(25, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
             fc_b = tf.get_variable(name="fc_1_b", shape=(512,), initializer=tf.ones_initializer(), dtype=tf.float32)
             self.para_dict['fc_1'] = [fc_W, fc_b]
 

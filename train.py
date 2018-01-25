@@ -45,7 +45,7 @@ def train(FLAG):
     vgg16.build(dp=dp)
 
     # define tasks
-    tasks = ['100', '90', '80', '70', '60', '50', '40', '30', '20']
+    tasks = ['100', '50']
     print(tasks)
     
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=len(tasks))
@@ -69,15 +69,15 @@ def train(FLAG):
         sess.run(tf.global_variables_initializer())
 
         # hyper parameters
-        learning_rate = 2e-5
+        learning_rate = 2e-4
         batch_size = 32
         alpha = 0.5
         early_stop_patience = 4
         min_delta = 0.0001
 
         # optimizer
-        opt = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
-
+        # opt = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
+        opt = tf.train.AdamOptimizer(learning_rate=learning_rate)
         # recorder
         epoch_counter = 0
 
