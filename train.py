@@ -173,7 +173,8 @@ def train(FLAG):
                 bar_val.finish()
 
                 print("Epoch %s (%s), %s sec >> obj loss: %.4f, task at %s: %.4f" % (epoch_counter, patience_counter, round(time.time()-stime,2), val_loss, cur_task, val_accu))
-
+        saver.save(sess, checkpoint_path, global_step=epoch_counter)
+        
         writer.close()
 
 if __name__ == '__main__':
