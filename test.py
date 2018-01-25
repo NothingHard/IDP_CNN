@@ -44,7 +44,7 @@ def test(FLAG):
             
             if ckpt and ckpt.model_checkpoint_path:
                 count = 0
-                for checkpoint in all_model_checkpoint_paths:
+                for checkpoint in ckpt.all_model_checkpoint_paths:
                     saver.restore(sess, checkpoint)
                     print("Model restored %s" % checkpoint)
                     sess.run(tf.global_variables())
@@ -62,7 +62,7 @@ def test(FLAG):
                         output.append((accu+accu2)/2)
                         print("At DP={dp:.4f}, accu={perf:.4f}".format(dp=dp_i, perf=(accu+accu2)/2))
                     res = pd.DataFrame.from_dict({'DP':[int(dp_i*100) for dp_i in dp],'accu':output})
-                    res.to_csv("task%s_%s" % (FLAG.output, count), index=False)
+                    res.to_csv("task%s_%s" % (count, FLAG.output), index=False)
                     print("Write into task%s_%s" % (count, FLAG.output))
 
 if __name__ == '__main__':
