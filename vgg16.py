@@ -115,8 +115,8 @@ class VGG16:
             # self.gamma_var.append(gamma)
 
             # user specified fully connected layers
-            # TEMPORARY from 512 to 25 
-            fc_W = tf.get_variable(name="fc_1_W", shape=(25, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
+            # TEMPORARY to 25 for experiment of cutoff 
+            fc_W = tf.get_variable(name="fc_1_W", shape=(512, 512), initializer=tf.truncated_normal_initializer(mean=0, stddev=0.1), dtype=tf.float32)
             fc_b = tf.get_variable(name="fc_1_b", shape=(512,), initializer=tf.ones_initializer(), dtype=tf.float32)
             self.para_dict['fc_1'] = [fc_W, fc_b]
 
